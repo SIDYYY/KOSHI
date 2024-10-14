@@ -1,74 +1,147 @@
-import { View, Text, TouchableWithoutFeedback, Keyboard } from "react-native";
-import React, { useRef, useState, useEffect } from "react";
-import SearchBar from "../../components/SearchBar";
+import React, { useState } from 'react';
+import { View, Text, Image, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { SelectList } from 'react-native-dropdown-select-list'
+import { SearchBar } from 'react-native-elements';
 import Container from "../../components/Container";
-import Button from "../../components/Button";
-import icons from "../../constants/icons";
-import { router } from "expo-router";
+import { useNavigation } from '@react-navigation/native';
+import { carModels } from '../../components/CarLISTS'
 
 const FindCars = () => {
-  const inputRef = useRef(null);
-  const [query, setQuery] = useState('')
-  const [searchText, setSearchText] = useState("");
+  const [search, setSearch] = useState('');
+  const [showFilters, setShowFilters] = useState(false); 
+  const [filterType, setFilterType] = useState('All'); // for car type filter
+  const [minPrice, setMinPrice] = useState(0); // Min price 
+  const [maxPrice, setMaxPrice] = useState(Infinity); // Max price 
+  const navigation = useNavigation(); 
 
-  const dismissKeyboard = () => {
-    Keyboard.dismiss(); // Hides the keyboard
-    inputRef.current?.blur(); // Blurs the TextInput
+  // select drop down list
+  const [type, setType] = useState([ 
+    {value: 'All'},
+    {value: 'Coupe'},
+    {value: 'SUV'},
+    {value: 'Pickup Truck'}
+  ]);
+
+  const allCarModels = Object.values(carModels).flat();
+
+  // Filter car models based on search input/type/price
+  const filteredCarModels = allCarModels.filter((carModel) => {
+    const matchesSearch = carModel.model.toLowerCase().includes(search.toLowerCase());
+    const matchesType = filterType === 'All' || carModel.type === filterType;
+    const matchesPrice = carModel.price >= minPrice && carModel.price <= maxPrice;
+
+    return matchesSearch && matchesType && matchesPrice;
+  });
+
+  const getSearch = (value) => {
+    setSearch(value);
+    console.log(value)
   };
-  const handleFocusInput = () => {
-    inputRef.current?.focus(); // Focus the TextInput when the button is pressed
+
+  const handleCarSelect = (carModel) => {
+    navigation.navigate('Details', { carModel });
   };
 
-  useEffect(() => {
-    // Listen for when the keyboard is dismissed
-    const keyboardHideListener = Keyboard.addListener("keyboardDidHide", () => {
-      inputRef.current?.blur(); // Blur the input when the keyboard is dismissed
-    });
+  const toggleFilters = () => {
+    setShowFilters(!showFilters); // Toggle filter visibility
+  };
 
-    // Clean up the listener when the component is unmounted
-    return () => {
-      keyboardHideListener.remove();
-    };
-  }, []);
+  const clearFilters = () => {
+    setSearch('');
+    setFilterType('All');
+    setMinPrice(0);
+    setMaxPrice(Infinity);
+
+    console.log(filterType)
+  };
 
   return (
     <Container>
-      {/* Invoke dismissKeyboard correctly */}
-      <TouchableWithoutFeedback
-        className="h-full"
-        onPress={dismissKeyboard} // Call the function directly, without the arrow function
-      >
-        <View className="space-y-14 my-auto">
-          <View className="items-center space-y-2">
-            <Text className="text-3xl font-black">Looking for a car?</Text>
-            <Text className="max-w-[300px] text-center text-[#9b9b9b] text-base">
-              Find it quickly with our easy-to-use search tool.
-            </Text>
-          </View>
-          <View>
-            <SearchBar
-              otherStyles="mb-6"
-              query={query}
-              setQuery={setQuery}
-              ref={inputRef}           
-            />
-            <Button
-              label="Find Cars Now"
-              icon={icons.search}
-              iconTint="#ffffff"
-              onPress={
-                searchText
-                  ? () => {
-                      router.push("/home");
-                      setSearchText("");
-                    }
-                  : handleFocusInput
-              }
-            />
-          </View>
+        {/* Search bar */}
+        <View className='mb-2.5'>
+          <SearchBar
+            placeholder="Search for a car model"
+            onChangeText={getSearch}
+            value={search}
+            lightTheme
+            round
+            containerStyle={{ backgroundColor: 'transparent', borderTopColor: 'transparent', borderBottomColor: 'transparent', padding: 0 }}
+            inputContainerStyle={{backgroundColor: 'white'}}
+            searchIcon={{ size: 24, color: 'black'}}
+            inputStyle className='bg-white rounded-r-2xl'
+          />
         </View>
-      </TouchableWithoutFeedback>
-    </Container>
+
+        {/* Filter Button Section */}
+        <TouchableOpacity className='bg-green p-2.5 rounded-3xl text-center my-3 w-32' onPress={toggleFilters}>
+          <Text className='text-white font-bold text-xl text-center'>{showFilters ? 'Hide Filters' : 'Show Filters'}</Text>
+        </TouchableOpacity>
+
+        {/* Filter Section */}
+        {showFilters && (
+          <View className='my-1.5'>
+            <Text>Filter by type:</Text>
+            <SelectList
+              setSelected={setFilterType}
+              data={type}
+              placeholder="Select Car Type"
+              defaultOption={{value: 'Select Car Type' }}
+              boxStyles={{ borderColor: '#ccc', marginBottom: 15 }}
+              />
+            <Text className='mt-3'>Min Price:</Text>
+            <TextInput
+              className='border border-[#ccc] rounded-md p-2 mb-2.5'
+              keyboardType="numeric"
+              placeholder="Minimum"
+              onChangeText={(value) => setMinPrice(Number(value))}
+              value={minPrice.toString()}
+            />
+            <Text>Max Price:</Text>
+            <TextInput
+              className='border border-[#ccc] rounded-md p-2 mb-2.5'
+              keyboardType="numeric"
+              placeholder="0"
+              onChangeText={(value) => setMaxPrice(Number(value))}
+              value={maxPrice === Infinity ? '' : maxPrice.toString()}
+            />
+            <TouchableOpacity className='bg-red-500 p-2 rounded-md mt-2' onPress={clearFilters}>
+              <Text className='text-white text-center'>Clear Filters</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <Text className='my-5 text-xl font-bold'>Result</Text>
+
+        {/* Display Section */}
+        <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: 20 }} className='pb-5'>
+          {filteredCarModels.length > 0 ? (
+            filteredCarModels.map((carModel) => (
+              <TouchableOpacity
+                key={carModel.id}
+                className='bg-white flex flex-row items-center mb-4 rounded-lg shadow-md p-2 w-full'
+                onPress={() => handleCarSelect(carModel)}
+              >
+                <Image source={{ uri: carModel.image }} className='w-11 mr-5 rounded-lg' />
+                <View className='my-2.5 flex-1'>
+                  <Text className='text-xl font-bold flex-wrap w-52'>{carModel.model} ({carModel.year})</Text>
+                  <Text className='mt-2.5 text-base text-[#9B9B9B]'>Price:</Text>
+                  <Text className='text-[#3E9C35] text-base'>Php {carModel.price.toLocaleString()}</Text>
+                  <View className='flex-col w-full'>
+                    <Text className='mt-2.5 text-[#9B9B9B] text-base'>{carModel.variants.length} Variants</Text>
+                    <Text className='text-[#ECAE36] text-base'>Type: {carModel.type}</Text>
+                  </View>
+                  <TouchableOpacity className='mt-3 border-2 p-2.5 w-full rounded-xl border-[#101820]' onPress={() => handleCarSelect(carModel)}>
+                    <Text className='text-sm font-bold text-center'>View Detail</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <Text className='text-lg mt-5'>No car model found</Text>
+          )}
+        </ScrollView>
+
+      </Container>
   );
 };
 
